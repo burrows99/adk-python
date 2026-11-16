@@ -181,6 +181,10 @@ class NodeRunner:
           if ctx.error is None or not await self._attempt_retry(
               ctx.error, attempt_count
           ):
+            # A node that delegated its output without returning it still
+            # hands the delegate's output to its successors.
+            if ctx._output_value is None:
+              ctx._output_value = ctx._delegated_output
             await self._flush_output_and_deltas(ctx)
             logger.debug("node %s end.", ctx.node_path)
             return ctx

@@ -1816,6 +1816,41 @@ async def test_use_as_output_with_downstream():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('nested', [False, True])
+async def test_use_as_output_with_downstream_without_return(nested: bool):
+  """Delegated output reaches downstream when the delegator returns nothing.
+
+  A awaits ctx.run_node(..., use_as_output=True) without returning its result
+  (directly, or through B doing the same). downstream still receives the
+  delegate's output, and no extra output event is emitted for A or B.
+  """
+  from google.adk.workflow._function_node import FunctionNode
+
+  def func_c() -> str:
+    return 'from_c'
+
+  async def func_b(ctx: Context) -> None:
+    await ctx.run_node(func_c, use_as_output=True)
+
+  node_b = FunctionNode(func=func_b, rerun_on_resume=True)
+
+  async def func_a(ctx: Context) -> None:
+    await ctx.run_node(node_b if nested else func_c, use_as_output=True)
+
+  node_a = FunctionNode(func=func_a, rerun_on_resume=True)
+
+  downstream = _InputCapturingNode(name='downstream')
+
+  wf = Workflow(name='wf', edges=[(START, node_a, downstream)])
+  events, _, _ = await _run_workflow(wf)
+
+  assert downstream.received_inputs == ['from_c']
+  by_node = _output_by_node(events)
+  assert ('func_c', 'from_c') in by_node
+  assert not any(name in ('func_a', 'func_b') for name, _ in by_node)
+
+
+@pytest.mark.asyncio
 async def test_use_as_output_duplicate_raises():
   """Calling use_as_output=True twice in the same node raises ValueError."""
   from google.adk.workflow._function_node import FunctionNode

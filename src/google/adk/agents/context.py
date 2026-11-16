@@ -211,6 +211,7 @@ class Context(ReadonlyContext):
     self._node_rerun_on_resume = node.rerun_on_resume if node else True
     self._attempt_count = attempt_count
     self._output_delegated = False
+    self._delegated_output: Any = None
     self._output_value: Any = None
     self._output_emitted: bool = False
     self._route_value: RouteValue | list[RouteValue] | None = None
